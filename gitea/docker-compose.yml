@@ -1,0 +1,21 @@
+version: '1.0'
+services:
+  gitea-server:
+    container_name: gitea
+    hostname: gitea
+    image: gitea/gitea
+    restart: always
+    networks:
+      - gitea
+    ports:
+      - "222:22"
+      - "3000:3000"
+    volumes:
+      - /www/docker/gitea:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+networks:
+  default:
+  gitea:
+    external:
+      name: bridge-dev

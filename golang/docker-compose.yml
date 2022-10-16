@@ -1,0 +1,14 @@
+version: '1.0'
+services:
+  code-server:
+    container_name: vscode-server-lit
+    hostname: dev-lit
+    image: taodev/vscode-server:golang
+    restart: always
+    command: code-server serve-local --host 0.0.0.0 --port 80 --accept-server-license-terms --server-data-dir=/root/.vscode-server --without-connection-token
+    ports:
+      - "127.0.0.1:21080:80"
+      - "21000-21010:8000-8010"
+      - "21100:9317"
+    volumes:
+      - ../build/lit:/root
