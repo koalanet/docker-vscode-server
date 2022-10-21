@@ -1,7 +1,7 @@
 FROM openanolis/anolisos:8.6
 
 # 安装基础工具
-RUN yum install -y wget curl vim git make telnet
+RUN yum install -y wget curl vim git make telnet screen
 # 安装开发工具
 RUN yum groupinstall -y "Development Tools"
 
