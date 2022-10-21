@@ -80,6 +80,7 @@ NODE_PATH=$APP_ROOT/node
 if [ ! -d "$HOST_ROOT" ]; then
   echo "mkdir -p $HOST_ROOT"
   mkdir -p $HOST_ROOT
+  mkdir -p $HOST_ROOT/tmp
 fi
 
 # 创建home目录
@@ -149,6 +150,7 @@ services:
       - "11100:9317"
     volumes:
       - $HOST_ROOT:/host
+      - $HOST_ROOT/tmp:/tmp
       - $HOME_PATH:/root
       - $GOLANG_PATH/go1.19.2:/usr/local/go
       - $NODE_PATH/node-v16.18.0:/usr/local/node
