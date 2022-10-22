@@ -3,11 +3,32 @@
 COMMAND=$1
 COMMAND_ARGS=$2
 
+CURRENT_DIR=$(cd $(dirname $0); pwd)
+
+# 用户名称
+VSCODE_USER=$2
+
+# 基础目录环境变量
+# 编排文件目录
+COMPOSE_PATH=$CURRENT_DIR/compose
+COMPOSE_FILE=$COMPOSE_PATH/$VSCODE_USER.yml
+
+# 下载缓存目录
+DOWN_PATH=$CURRENT_DIR/down
+
+# 应用目录
+APP_PATH=$CURRENT_DIR/app/$VSCODE_USER
+# home目录(重要文件不要存在这个目录下)
+HOME_PATH=$CURRENT_DIR/home/$VSCODE_USER
+# 用户代码目录(记得周期性备份)
+CODE_PATH=$CURRENT_DIR/code/$VSCODE_USER
+# 应用数据目录(数据库相关文件存储目录，建议不要在redis里面存储重要文件)
+DATA_PATH=$CURRENT_DIR/data/$VSCODE_USER
+
 ask_input() {
   read -r -p "$1 [y/N] " input
   case $input in 
     [yY][eE][sS]|[yY])
-      docker compose down
       return 0
   esac
 
@@ -20,13 +41,27 @@ if [ "${COMMAND}" = "clean" ]; then
 
   if ask_input "是否卸载容器?"; then
     echo "正在卸载容器..."
-    docker compose down
+    docker compose --file=$COMPOSE_FILE down
   fi
 
-  if ask_input "是否清除用户数据?清理后将无法恢复"; then 
-    echo "删除用户数据..."
-    rm -f ./docker-compose.yml
-    rm -fr ./data
+  if ask_input "是否删除docker-compose-$VSCODE_USER.yml"; then 
+    rm -f $COMPOSE_FILE
+  fi
+
+  if ask_input "是否删除$APP_PATH"; then 
+    rm -fr $APP_PATH
+  fi
+
+  if ask_input "是否删除$HOME_PATH"; then 
+    rm -fr $HOME_PATH
+  fi
+
+  if ask_input "是否删除$CODE_PATH"; then 
+    rm -fr $CODE_PATH
+  fi
+
+  if ask_input "是否删除$DATA_PATH"; then 
+    rm -fr $DATA_PATH
   fi
 
   # 输出docker占用空间
@@ -41,107 +76,69 @@ if [ "${COMMAND}" = "clean" ]; then
 elif [ "${COMMAND}" = "network" ]; then
   docker network create --subnet=10.10.1.0/16 --gateway=10.10.1.1 --opt "com.docker.bridge.name"="bridge-dev" bridge-dev
   exit
-elif [ "${COMMAND}" = "up" ]; then
-  docker compose up -d
-  exit
 elif [ "${COMMAND}" = "down" ]; then
-  docker compose down
+  docker compose --file=$COMPOSE_FILE down
   exit
 elif [ "${COMMAND}" = "stop" ]; then
-  docker compose stop
+  docker compose --file=$COMPOSE_FILE stop
   exit
 elif [ "${COMMAND}" = "start" ]; then
-  docker compose start
+  docker compose --file=$COMPOSE_FILE start
   exit
 elif [ "${COMMAND}" = "restart" ]; then
-  docker compose restart
+  docker compose --file=$COMPOSE_FILE restart
   exit
 elif [ "${COMMAND}" = "build" ]; then
   docker build -t taodev/vscode-server:latest .
   exit
-elif [ "${COMMAND}" = "install" ]; then
+elif [ "${COMMAND}" = "up" ]; then
 
-CURRENT_DIR=$(cd $(dirname $0); pwd)
-
-# 名称
-HOST_USER=$2
-
-# 基础目录环境变量
-HOST_ROOT=$CURRENT_DIR/data
-HOME_PATH=$HOST_ROOT/home
-APP_ROOT=$HOST_ROOT/app
-
-# 开发工具环境变量
-VSCODE_SERVER_PATH=$APP_ROOT/vscode-server
-GOLANG_PATH=$APP_ROOT/go
-NODE_PATH=$APP_ROOT/node
-
-# 创建data目录
-if [ ! -d "$HOST_ROOT" ]; then
-  echo "mkdir -p $HOST_ROOT"
-  mkdir -p $HOST_ROOT
-  mkdir -p $HOST_ROOT/tmp
+if [ ! -d "$COMPOSE_PATH" ]; then
+  mkdir -p $COMPOSE_PATH echo $COMPOSE_PATH
 fi
 
-# 创建home目录
-if [ ! -d "$HOME_PATH" ]; then
-  echo "mkdir -p $HOME_PATH"
-  mkdir -p $HOME_PATH
+if [ ! -d "$DOWN_PATH" ]; then
+  mkdir -p $DOWN_PATH echo $DOWN_PATH
 fi
 
-# 创建code-server目录
-if [ ! -d "$VSCODE_SERVER_PATH" ]; then
-  echo "mkdir -p $VSCODE_SERVER_PATH"
-  mkdir -p $VSCODE_SERVER_PATH
-fi
+# 用户目录是否存在
+if [ ! -d "$APP_PATH" ]; then
+  echo "初始化用户目录"
 
-# 安装golang
-install_golang() {
-  mkdir -p $GOLANG_PATH
+  # 创建app目录
+  mkdir -p $APP_PATH && echo $APP_PATH
+  # 创建home目录
+  mkdir -p $HOME_PATH && echo $HOME_PATH
+  # 创建代码目录
+  mkdir -p $CODE_PATH && echo $CODE_PATH
+  # 创建app数据目录
+  mkdir -p $DATA_PATH && echo $DATA_PATH
 
-  # 下载安装包
-  wget https://golang.google.cn/dl/go1.19.2.linux-amd64.tar.gz
-  tar -C $GOLANG_PATH -zxf ./go1.19.2.linux-amd64.tar.gz
-  rm -f ./go1.19.2.linux-amd64.tar.gz
-  mv $GOLANG_PATH/go $GOLANG_PATH/go1.19.2
+  # 创建vscode-server目录
+  mkdir -p $APP_PATH/vscode-server && echo $APP_PATH/vscode-server
+  # 创建redis数据目录
+  mkdir -p $DATA_PATH/redis && echo $DATA_PATH/redis
 
-  # 配置环境变量在docker中去执行"sh /host/install.sh"
-}
+  # 安装nodejs
+  if [ ! -f "$DOWN_PATH/node-v16.18.0-linux-x64.tar.xz" ]; then
+    curl -o down/node-v16.18.0-linux-x64.tar.xz -O https://nodejs.org/dist/v16.18.0/node-v16.18.0-linux-x64.tar.xz
+  fi 
 
-if [ ! -d "$GOLANG_PATH" ]; then
-  install_golang
-fi
-
-# 安装nodejs
-install_node() {
-  mkdir -p $NODE_PATH
-
-  # 下载安装包
-  wget https://nodejs.org/dist/v16.18.0/node-v16.18.0-linux-x64.tar.xz
-  tar -C $NODE_PATH -xf ./node-v16.18.0-linux-x64.tar.xz
-  rm -f ./node-v16.18.0-linux-x64.tar.xz
-  mv $NODE_PATH/node-v16.18.0-linux-x64 $NODE_PATH/node-v16.18.0
-  
-  # 配置环境变量在docker中去执行"sh /host/install.sh"
-}
-
-if [ ! -d "$NODE_PATH" ]; then
-  install_node
+  tar -xf $DOWN_PATH/node-v16.18.0-linux-x64.tar.xz -C $APP_PATH
+  mv $APP_PATH/node-v16.18.0-linux-x64 $APP_PATH/node
 fi
 
 # 生成docker-compose.yml
-# mkdir -p ./docker
-DOCKER_COMPOSE_FILE="./docker-compose.yml"
+DOCKER_COMPOSE_FILE=$COMPOSE_FILE
 DOCKER_COMPOSE=$(cat <<- EOF
 version: '1.0'
 
 services:
   vscode-server:
-    container_name: vscode-server-$HOST_USER
-    hostname: dev-$HOST_USER
+    container_name: dev-$VSCODE_USER
+    hostname: dev-$VSCODE_USER
     image: taodev/vscode-server
     restart: always
-    command: code-server serve-local --host 0.0.0.0 --port 80 --accept-server-license-terms --server-data-dir=/host/app/vscode-server --without-connection-token
     networks:
       - bridge-dev
     ports:
@@ -149,11 +146,10 @@ services:
       - "11000-11010:8000-8010"
       - "11100:9317"
     volumes:
-      - $HOST_ROOT:/host
-      - $HOST_ROOT/tmp:/tmp
+      - $APP_PATH:/app
       - $HOME_PATH:/root
-      - $GOLANG_PATH/go1.19.2:/usr/local/go
-      - $NODE_PATH/node-v16.18.0:/usr/local/node
+      - $CODE_PATH:/code
+      - $DATA_PATH:/data
 
 networks:
   bridge-dev:
@@ -180,11 +176,8 @@ if [ -f ~/.bashrc ]; then
 fi
 
 # User specific environment and startup programs
-export GO111MODULE=on
-export GOPROXY=https://goproxy.cn,direct
-export GOROOT=/usr/local/go
-export GOPATH=/host/go
-export PATH=\$PATH:/usr/local/go/bin:/host/go/bin:/usr/local/node/bin
+export GOPATH=/code
+export PATH=\$PATH:/code/bin:/app/node/bin:/root/bin
 
 EOF
 )
@@ -223,7 +216,8 @@ if [ ! -f "$BASHRC_FILE" ]; then
   build_bashrc
 fi
 
-echo "安装完成"
+# 安装并容器
+docker compose --file=$COMPOSE_FILE up
 
 exit 
 
